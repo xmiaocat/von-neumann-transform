@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "von_neumann_transform"
+dynamic = ["version"]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy == 2.3.*",
+    "scipy == 1.16.*",
+]
+authors = [
+  { name="Xincheng Miao", email="xincheng.miao@uni-wuerzburg.de" },
+]
+description = "A Python package for efficient von Neumann transform"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*"]
+keywords = [
+    "von Neumann transform",
+    "von Neumann representation",
+    "ultrashort laser pulse",
+    "joint time-frequency analysis",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Typing :: Typed",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest >= 8.4",
+    "pytest-cov >= 6.2",
+    "black",
+    "flake8",
+    "flake8-pyproject",
+    "mypy",
+]
+
+[project.urls]
+Homepage = "https://github.com/xmiaocat/von-neumann-transform"
+Issues = "https://github.com/xmiaocat/von-neumann-transform/issues"
+
+[tool.hatch.version]
+path = "src/von_neumann_transform/__init__.py"
+style = "pep440"
+
+[tool.black]
+line-length = 79
+target-version = ["py313"]
+
+[tool.flake8]
+max-line-length = 79
+exclude = ["venv", "test/helpers"]
+extend-ignore = ["E203", "E501"]
+
+[tool.mypy]
+python_version = 3.13
+strict = false
+ignore_missing_imports = true
+files = "src/von_neumann_transform"
+
+[tool.pytest.ini_options]
+addopts = "--cov=src --cov-report=term-missing"
+
