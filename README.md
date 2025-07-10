@@ -75,30 +75,30 @@ will have the dimension $k \times k$ with $k^2 = N$.
 
 ### Signal Projection
 The signal projection is defined as
-$$
-  \langle \alpha_ij | \epsilon \rangle 
-  = \int_{-\infty}^{\infty} \alpha^*_{\omega_i t_j}(\omega) \epsilon(\omega) d\omega
-$$
+```math
+  \langle \alpha_{\omega_i t_j} | \epsilon \rangle
+  = \int_{-\infty}^{\infty} \alpha^*_{\omega_i t_j}(\omega) \epsilon(\omega) \mathrm{d}\omega
+```
 where $\alpha_{\omega_i t_j}(\omega)$ are the von Neumann basis functions
-$$
+```math
   \alpha_{\omega_n t_m}(\omega) 
   = \left(\frac{2\alpha}{\pi}\right)^{1/4} 
-    \exp \left[ -alpha (\omega - \omega_n)^2 - \mathrm{i} t_m (\omega - \omega_n)^2 \right]
-$$
+    \exp \left[ -\alpha (\omega - \omega_n)^2 - \mathrm{i} t_m (\omega - \omega_n)^2 \right]
+```
 and $\epsilon(\omega)$ is the signal in the frequency domain.
 
 In the discrete world, the basis functions $\alpha_{\omega_n t_m}(\omega)$
 are sampled at $N$ points in the frequency domain, and therefore has the
 shape `(k, k, N)`. The projection is then computed as
-$$
+```math
   \alpha_{nm} = \sum_{p=0}^{N-1} \alpha_{\omega_n t_m}(\omega_p) \epsilon(\omega_p)\,.
-$$
+```
 The time complexity of this operation is $\mathcal{O}(k^2 N)$.
 The space complexity is also $\mathcal{O}(k^2 N)$ if the basis functions
 are precomputed and stored. 
 
 The basis functions can be factorised as
-$$
+```math
   \begin{align}
   \alpha_{\omega_n t_m}(\omega) 
   &= \left(\frac{2\alpha}{\pi}\right)^{1/4} 
@@ -108,7 +108,7 @@ $$
   &=: \left(\frac{2\alpha}{\pi}\right)^{1/4} 
     \alpha_{\omega_n}(\omega) \alpha_{t_m}(\omega) \alpha_{\omega_n t_m}\,.
   \end{align}
-$$
+```
 The discretised version of the factors $\alpha_{\omega_n}(\omega)$,
 $\alpha_{t_m}(\omega)$ and $\alpha_{\omega_n t_m}$ have the shapes
 `(k, N)`, `(k, N)` and `(k, k)` respectively. This way, 
@@ -133,17 +133,17 @@ The computational complexity of all three methods is summarised in the table bel
 ### Overlap Assembly & Solvers
 Since there are in total $k\times k = N$ basis functions, the overlap
 matrix
-$$
+```math
   S_{(n,m),(i,j)} = \sqrt{\frac{2\alpha}{\pi}}
     \exp \left[ -\frac{\alpha}{2}(\omega_n - \omega_i)^2
-                -\frac{1}{8\alpha}(t_j - t_m)^2 \right
+                -\frac{1}{8\alpha}(t_j - t_m)^2 
                 +\frac{\mathrm{i}}{2}(\omega_i - \omega_n)(t_j + t_m) \right]
-$$
+```
 has the dimension $N \times N$. Precomputing it and then solving the
 linear system
-$$
+```math
   \sum_{(i,j)} S_{(n,m),(i,j)} q_{(i,j)} = \langle \alpha_{nm} | \epsilon \rangle
-$$
+```
 directly would have a time complexity of $\mathcal{O}(N^3)$ 
 and a space complexity of $\mathcal{O}(N^2)$.
 This can become quite expensive for signals with a large number of points,
@@ -177,7 +177,7 @@ This way, the expensive "ordinary" matrix-vector product only needs to be
 computed on the much smaller blocks, thus reducing the time complexity
 of the matrix-vector product to $\mathcal{O}(k^3)$.
 Overall, the time complexity of this method is
-$\mathcal{O}(k^3}$ and the space complexity is $\mathcal{O}(k^3)$.
+$\mathcal{O}(k^3)$ and the space complexity is $\mathcal{O}(k^3)$.
 
 In theory, the Toeplitz-Hankel hadamard product structure of the blocks
 can be exploited further to reduce the time complexity of the 
