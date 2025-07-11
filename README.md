@@ -18,7 +18,6 @@ defined in
 ## TODO
 - [ ] Add consistency tests for solvers.
 - [ ] Add consistency tests for inverse transform.
-- [ ] Continuously integrate with GitHub Actions.
 
 ## Features
 - Grid generation: Build uniform time-frequency grids in the
