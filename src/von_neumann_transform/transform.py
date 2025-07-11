@@ -45,7 +45,7 @@ class VonNeumannTransform:
             self.k,
             self.alpha,
         ) = _get_grid(npoints, self.w_min, self.w_max)
-        
+
         # Placeholder for evaluated basis functions
         self.alpha_nmo: None | np.ndarray = None
 

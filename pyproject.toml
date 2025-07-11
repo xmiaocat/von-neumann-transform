@@ -47,6 +47,7 @@ dev = [
     "flake8",
     "flake8-pyproject",
     "mypy",
+    "pre-commit",
 ]
 
 [project.urls]
@@ -62,8 +63,7 @@ line-length = 79
 target-version = ["py313"]
 
 [tool.flake8]
-max-line-length = 79
-exclude = ["venv", "test/helpers"]
+exclude = ["tests/helpers", "build", "dist", "venv"]
 extend-ignore = ["E203", "E501"]
 
 [tool.mypy]

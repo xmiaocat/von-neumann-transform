@@ -36,6 +36,13 @@ MATVEC_AND_SOLVER_METHODS = [
         marks=pytest.mark.xfail(reason="Hankel method not implemented yet"),
     ),
 ]
+MATVEC_AND_SOLVER_METHODS_XFAIL = [
+    (MatVecMethod.DIRECT, SolverMethod.CG),
+    (MatVecMethod.DIRECT, SolverMethod.BICGSTAB),
+    (MatVecMethod.DIRECT, SolverMethod.LGMRES),
+    (MatVecMethod.TOEPLITZ_MATMUL, SolverMethod.DIRECT),
+    (MatVecMethod.TOEPLITZ_EINSUM, SolverMethod.DIRECT),
+]
 
 
 @pytest.fixture(scope="module")
@@ -72,3 +79,18 @@ def test_vnt_example_pulses(
         )
 
         np.testing.assert_allclose(q_nm, q_nm_ref, rtol=1e-8, atol=1e-9)
+
+
+@pytest.mark.parametrize(
+    "matvec_method,solver_method",
+    MATVEC_AND_SOLVER_METHODS_XFAIL,
+)
+def test_vnt_example_pulses_xfail(ref_and_vnt, matvec_method, solver_method):
+    vnt, pulses, vncs_ref = ref_and_vnt
+    for pulse, q_nm_ref in zip(pulses, vncs_ref):
+        with pytest.raises(TypeError):
+            vnt.transform(
+                pulse,
+                matvec_method=matvec_method,
+                solver_method=solver_method,
+            )
