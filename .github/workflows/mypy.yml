@@ -1,4 +1,4 @@
-name: 📐 Mypy
+name: Mypy
 
 on:
   push:

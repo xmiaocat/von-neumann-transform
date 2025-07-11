@@ -1,4 +1,4 @@
-name: 🧪 Tests & Coverage
+name: Tests
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  # run tests + upload coverage
   tests:
+    name: 🧪 Tests on ${{ matrix.os }} with Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -26,8 +26,3 @@ jobs:
           pip install -e ".[dev]"
       - name: Run tests
         run: pytest --maxfail=1 --disable-warnings -q --cov=src/von_neumann_transform --cov-report=xml
-      - name: Upload coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
