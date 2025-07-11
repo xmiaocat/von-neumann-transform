@@ -4,16 +4,16 @@ A Python package for efficient computation of the von Neumann representation
 of a signal given in the frequency domain.
 The von Neumann representation is a joint time-frequency representation 
 defined in
-- S. Fechner, F. Dimler. T. Brixner, G. Gerber, J. Tannor,
+- S. Fechner, F. Dimler, T. Brixner, G. Gerber, J. Tannor,
   *Opt. Express* **2007**, *15*, 15387–15401.
 - F. Dimler, S. Fechner, A. Rodenberg, T. Brixner, J. Tannor,
   *New J. Phys.* **2009**, *11*, 105052.
 
 ## TODO
-- [ ] Add API reference
-- [ ] Add consistency tests for solvers
-- [ ] Add consistency tests for inverse transform
-- [ ] Continuously integrate with GitHub Actions
+- [ ] Add API reference.
+- [ ] Add consistency tests for solvers.
+- [ ] Add consistency tests for inverse transform.
+- [ ] Continuously integrate with GitHub Actions.
 
 ## Features
 - Grid generation: Build uniform time-frequency grids in the
@@ -70,8 +70,8 @@ signal_recon = vnt.inverse_transform(q_nm)
 ```
 
 ## Algorithmic Details
-This section gives an overview of each method and its computational complexity.
-Suppose the signal has length $N$. Then $k = \sqrt{N}$ chosen, so the
+This section provides an overview of each method and its computational complexity.
+Suppose the signal has length $N$. Then $k = \sqrt{N}$ is chosen, so the
 von Neumann representation is a $k \times k$ matrix.
 
 ### Signal Projection
@@ -84,7 +84,7 @@ where $\alpha_{\omega_i t_j}(\omega)$ are the von Neumann basis functions
 ```math
   \alpha_{\omega_n t_m}(\omega) 
   = \left(\frac{2\alpha}{\pi}\right)^{1/4} 
-    \exp \left[ -\alpha (\omega - \omega_n)^2 - \mathrm{i} t_m (\omega - \omega_n)^2 \right]
+    \exp \left[ -\alpha (\omega - \omega_n)^2 - \mathrm{i} t_m (\omega - \omega_n) \right]
 ```
 and $\epsilon(\omega)$ is the signal in the frequency domain.
 
@@ -151,10 +151,9 @@ This can become quite expensive for signals with a large number of points,
 
 In practice, the space is often the limiting factor. Therefore, the usual
 approach would be to implement a matrix-vector operator
-that computes the product of the overlap matrix with a vector
-by evaluating and contracting every row of the overlap matrix
-with the vector on-the-fly, and then use an iterative solver
-like the conjugate gradient method to solve the linear system.
+that computes the overlap-matrix-vector product on-the-fly
+by contracting each row, then feeds that result into an iterative 
+solver like the conjugate gradient method to solve the linear system.
 This approach has a time complexity of $\mathcal{O}(N^2)$ per iteration
 and a space complexity of $\mathcal{O}(N)$, which is much more feasible
 for large signals.
@@ -170,7 +169,7 @@ The block Toeplitz structure means that we only need the first
 block row and the first block column of the matrix to construct the
 entire matrix. Because of the hermiticity, we even only need the
 first block column of the dimension $N \times k$.
-Even better, the block Toeplitz stucture allows one to efficiently compute
+Even better, the block Toeplitz structure allows one to efficiently compute
 the matrix-vector product by embedding the the matrix into a larger
 $2N \times 2N$ block circulant matrix and then using batch FFTs to compute
 the product in $\mathcal{O}(k^2 \log k)$ time.
@@ -180,7 +179,7 @@ of the matrix-vector product to $\mathcal{O}(k^3)$.
 Overall, the time complexity of this method is
 $\mathcal{O}(k^3)$ and the space complexity is $\mathcal{O}(k^3)$.
 
-In theory, the Toeplitz-Hankel hadamard product structure of the blocks
+In theory, the Toeplitz-Hankel Hadamard product structure of the blocks
 can be exploited further to reduce the time complexity of the 
 matrix-vector product of blocks to $\mathcal{O}(k^2 \log k)$,
 but this is not implemented in this package yet.
@@ -196,7 +195,7 @@ in the table below:
 |-----------------|-------------------|------------------|
 | direct (`MatVecMethod.DIRECT`) | $\mathcal{O}(N^3)$ | $\mathcal{O}(N^2)$ |
 | rows of overlap + iterative solver (not implemented) | $\mathcal{O}(m\cdot N^2)$ | $\mathcal{O}(N)$ |
-| Toeplitz + iterative solver + preconditioner (`MatVecMethod.TOEPLITZ_MATMUL` or `MatVecMethod.TOEPLITZ_EINSUM`) | $\mathcal{O}(N^2 + m\cdot N^{3/2}$ | $\mathcal{O}(N^{3/2})$ |
+| Toeplitz + iterative solver + preconditioner (`MatVecMethod.TOEPLITZ_MATMUL` or `MatVecMethod.TOEPLITZ_EINSUM`) | $\mathcal{O}(N^2 + m\cdot N^{3/2})$ | $\mathcal{O}(N^{3/2})$ |
 
 The variable $m$ is the number of iterations of the iterative solver.
 
