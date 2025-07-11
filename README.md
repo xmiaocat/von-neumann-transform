@@ -1,5 +1,11 @@
 # Von Neumann Transform
 
+[![CI](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ci.yml/badge.svg)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ci.yml)
+[![Tests](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ci.yml/badge.svg?query=jobs%3Atests)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ci.yml)
+[![Flake8](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ci.yml/badge.svg?query=jobs%3Aflake8)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ci.yml)
+[![Mypy](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ci.yml/badge.svg?query=jobs%3Amypy)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/gh/xmiaocat/von-neumann-transform/branch/main/graph/badge.svg)](https://codecov.io/gh/xmiaocat/von-neumann-transform)
+
 A Python package for efficient computation of the von Neumann representation 
 of a signal given in the frequency domain.
 The von Neumann representation is a joint time-frequency representation 
