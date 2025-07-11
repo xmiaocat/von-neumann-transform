@@ -10,7 +10,6 @@ defined in
   *New J. Phys.* **2009**, *11*, 105052.
 
 ## TODO
-- [ ] Add API reference.
 - [ ] Add consistency tests for solvers.
 - [ ] Add consistency tests for inverse transform.
 - [ ] Continuously integrate with GitHub Actions.
