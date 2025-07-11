@@ -1,4 +1,4 @@
-name: CI
+name: 🧪 Tests & Coverage
 
 on:
   push:
@@ -9,7 +9,6 @@ on:
 jobs:
   # run tests + upload coverage
   tests:
-    name: 🧪 Tests & Coverage
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -32,25 +31,3 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-
-  flake8:
-    name: 🔍 Flake8
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - run: pip install -e ".[dev]"
-      - run: flake8 src/von_neumann_transform tests
-
-  mypy:
-    name: 📐 Mypy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - run: pip install -e ".[dev]"
-      - run: mypy src/von_neumann_transform
