@@ -4,6 +4,7 @@
 [![Flake8](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/flake8.yml/badge.svg)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/flake8.yml)
 [![Mypy](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/mypy.yml/badge.svg)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/mypy.yml)
 [![Codecov](https://codecov.io/gh/xmiaocat/von-neumann-transform/branch/main/graph/badge.svg)](https://codecov.io/gh/xmiaocat/von-neumann-transform)
+[![PyPI version](https://img.shields.io/pypi/v/von-neumann-transform.svg)](https://pypi.org/project/von-neumann-transform/)
 
 A Python package for efficient computation of the von Neumann representation 
 of a signal given in the frequency domain.
@@ -40,13 +41,19 @@ defined in
   select algorithms, all functions and methods include type hints.
 
 ## Installation
-Currently, this package is only available on GitHub.
+
+Install from PyPI:
 ```bash
-git clone https://github.com/xmiaocat/von-neumann-transform
-cd von-neumann-transform
-pip install .
+pip install von-neumann-transform
 ```
-Alternatively, you can install in development mode with
+
+Install the latest development version from GitHub:
+```bash
+pip install git+https://github.com/xmiaocat/von-neumann-transform.git
+```
+
+To install in development mode including dev dependencies, 
+clone the repository and run:
 ```bash
 pip install -e ".[dev]"
 ```
