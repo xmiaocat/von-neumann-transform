@@ -1,6 +1,6 @@
 # Von Neumann Transform
 
-A python package for efficient computation of the von Neumann representation 
+A Python package for efficient computation of the von Neumann representation 
 of a signal given in the frequency domain.
 The von Neumann representation is a joint time-frequency representation 
 defined in
@@ -16,7 +16,8 @@ defined in
 - [ ] Continuously integrate with GitHub Actions
 
 ## Features
-- Grid generation: Uniform grids in the von Neumann plane
+- Grid generation: Build uniform time-frequency grids in the
+  von Neumann plane.
 - Signal projection: Compute the projection of the frequency-domain 
   signal onto the von Neumann basis functions *via*:
   - Direct method: precompute and store the basis functions.
@@ -31,7 +32,7 @@ defined in
     iterative solver routines.
 - Signal reconstruction: Reconstruct the original frequency-domain
   signal from von Neumann coefficients.
-= Type-safe API: Enums (`BasisMethod`, `MatVecMethod`, `SolverMethod`)
+- Type-safe API: Enums (`BasisMethod`, `MatVecMethod`, `SolverMethod`)
   select algorithms, all functions and methods include type hints.
 
 ## Installation
@@ -43,7 +44,7 @@ pip install .
 ```
 Alternatively, you can install in development mode with
 ```bash
-pip install -e '.[dev]'
+pip install -e ".[dev]"
 ```
 
 ## Quickstart
@@ -55,7 +56,7 @@ NPOINTS = 4096  # length of the signal
 W_MIN = 0.0  # minimum angular frequency
 W_MAX = 5.0  # maximum angular frequency
 
-# Yout signal in the frequency domain
+# Your signal in the frequency domain
 signal = np.random.rand(NPOINTS) + 1.0j * np.random.rand(NPOINTS)
 
 # Create a Von Neumann Transform instance
@@ -70,8 +71,8 @@ signal_recon = vnt.inverse_transform(q_nm)
 
 ## Algorithmic Details
 This section gives an overview of each method and its computational complexity.
-Suppose the signal has length $N$. Then its von Neumann representation
-will have the dimension $k \times k$ with $k^2 = N$.
+Suppose the signal has length $N$. Then $k = \sqrt{N}$ chosen, so the
+von Neumann representation is a $k \times k$ matrix.
 
 ### Signal Projection
 The signal projection is defined as
@@ -206,6 +207,117 @@ complexity applies.
 
 
 ## API Reference
-WIP
 
+### Class `VonNeumannTransform`
+
+`VonNeumannTransform(npoints: int, omega_min: float, omega_max: float)`
+
+Initialise a Von Neumann Transform instance.
+
+- **Parameters:**
+  - `npoints`: Number of points in the frequency domain signal.
+  - `omega_min`: Minimum angular frequency.
+  - `omega_max`: Maximum angular frequency.
+
+```
+transform(
+    signal: np.ndarray,
+    basis_method: BasisMethod = BasisMethod.FFT,
+    matvec_method: MatVecMethod = MatVecMethod.TOEPLITZ_MATMUL,
+    solver_method: SolverMethod = SolverMethod.CG,
+    rtol: float = 1e-10,
+    atol: float = 0.0,
+    maxiter: int = 1000,
+) -> np.ndarray
+```
+
+Computes the von Neumann representation of the signal.
+
+- Parameters:
+    - signal (np.ndarray): Input signal in the frequency domain.
+    - basis_method (BasisMethod): Method to compute the projection
+        of the signal onto the basis functions.
+        Possible values are:
+        - `BasisMethod.DIRECT`: Directly compute the projection
+          by precomputing and storing the basis functions.
+        - `BasisMethod.FACTORISE`: Use the factorisation of the basis
+          functions to compute the projection.
+        - `BasisMethod.FFT`: Use the FFT to compute the projection.
+    - matvec_method (MatVecMethod): Method to compute the overlap matrix.
+        Possible values are:
+        - `MatVecMethod.DIRECT`: Directly assemble the overlap matrix.
+           Requires `SolverMethod.DIRECT`.
+        - `MatVecMethod.TOEPLITZ_MATMUL`: Use the Toeplitz structure
+          to compute the matrix-vector product.
+        - `MatVecMethod.TOEPLITZ_EINSUM`: Use the Toeplitz structure
+          to compute the matrix-vector product with einsum.
+        The latter two methods require an iterative solver
+        (`SolverMethod.CG`, `SolverMethod.BICGSTAB`, or `SolverMethod.LGMRES`).
+    - solver_method (SolverMethod): Method to solve the linear system.
+        - `SolverMethod.DIRECT`: Use a direct solver. Requires
+          `MatVecMethod.DIRECT`.
+        - `SolverMethod.CG`: Use the conjugate gradient method.
+        - `SolverMethod.BICGSTAB`: Use the biconjugate gradient
+          stabilised method.
+        - `SolverMethod.LGMRES`: Use the LGMRES method.
+        The iterative solvers require
+        `MatVecMethod.TOEPLITZ_MATMUL` or `MatVecMethod.TOEPLITZ_EINSUM`.
+    - rtol, atol (float): Relative and absolute tolerances for the
+        iterative solver.
+    - maxiter (int): Maximum number of iterations for the iterative
+        solver.
+
+- Returns:
+    - q_nm (np.ndarray): Von Neumann coefficients, solution of the
+        linear system S * q_nm = alpha_nm.
+
+```
+inverse_transform(
+    q_nm: np.ndarray,
+    method: BasisMethod = BasisMethod.FFT,
+) -> np.ndarray
+```
+
+Reconstructs the signal from the von Neumann coefficients.
+
+- Parameters:
+    - q_nm (np.ndarray): Von Neumann coefficients.
+    - method (BasisMethod): Method to compute the inverse projection.
+        Possible values are:
+        - `BasisMethod.DIRECT`: Directly reconstruct the signal
+          by precomputing and storing the basis functions.
+        - `BasisMethod.FACTORISE`: Use the factorisation of the basis
+          functions to reconstruct the signal.
+        - `BasisMethod.FFT`: Use the FFT to reconstruct the signal.
+- Returns:
+    - signal (np.ndarray): Reconstructed signal in the frequency domain.
+
+### Enums
+
+`BasisMethod`
+Selects how basis functions are handled in the projection and reconstruction:
+- `BasisMethod.DIRECT`: Precompute and store the basis functions.
+- `BasisMethod.FACTORISE`: Use the factorisation of the basis functions.
+- `BasisMethod.FFT`: Use the FFT to compute the projection and reconstruction.
+
+`MatVecMethod`
+Selects how the overlap operator is applied:
+- `MatVecMethod.DIRECT`: Directly assemble the overlap matrix and multiply.
+- `MatVecMethod.TOEPLITZ_MATMUL`: Use the Toeplitz structure to compute
+  the matrix-vector product.
+- `MatVecMethod.TOEPLITZ_EINSUM`: Use the Toeplitz structure to compute
+  the matrix-vector product with einsum.
+- `MatVecMethod.TOEPLITZ_HANKEL`: Use the Toeplitz-Hankel structure
+  to compute the matrix-vector product. **Not implemented yet.**
+
+`SolverMethod`
+Selects the linear solver for overlap inversion:
+- `SolverMethod.DIRECT`: Use a direct solver.
+- `SolverMethod.CG`: Use the conjugate gradient method.
+- `SolverMethod.BICGSTAB`: Use the biconjugate gradient stabilised method.
+- `SolverMethod.LGMRES`: Use the LGMRES method.
+
+## License
+Distributed under the Apache License 2.0.
+See `LICENSE` for more information.
 
