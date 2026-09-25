@@ -61,8 +61,13 @@ uv run pytest
 ```
 
 The development tools are installed by default from the `dev` dependency
-group. The project environment is managed in `.venv`; no activation is
-needed when commands are run with `uv run`.
+group.
+
+Install the additional dependencies for running and analysing benchmarks with:
+
+```bash
+uv sync --group benchmark
+```
 
 
 ## Quickstart
@@ -95,6 +100,27 @@ default. For repeated small operations, the computation may be dominated by
 thread-management overhead, so single-threaded execution is recommended.
 For dense direct solves and large factorisations, multiple threads may be
 beneficial.
+
+
+## Benchmarks
+
+The benchmark suite compares the overlap operators and preconditioners, as
+well as the direct, factorised, and FFT-based projection and reconstruction
+methods. Timing and peak-memory measurements run in separate fresh subprocesses
+to keep measurement overhead out of the timed operations.
+
+Run the default benchmark configuration and generate its summaries and figures
+with:
+
+```bash
+uv run --group benchmark python benchmarks/run_benchmarks.py
+uv run --group benchmark python benchmarks/analyze_benchmarks.py
+```
+
+Raw measurements are written to `benchmarks/results/`, and summaries and plots
+to `benchmarks/reports/`; both directories are ignored by Git. See the
+[benchmark documentation](benchmarks/README.md) for study definitions,
+configuration overrides, smoke runs, and output details.
 
 
 ## Algorithmic Details
@@ -240,17 +266,11 @@ The Fourier-banded method truncates only the inner separation after the
 block FFT, while the stencil truncates both separations before multiplication.
 The current implementation uses $R=4$ for both methods.
 
-The preconditioner can be selected independently of the matrix-vector
-method.
-`PrecondMethod.NONE` selects the identity preconditioner, while
-`PrecondMethod.CIRCULANT_DENSE` and `PrecondMethod.CIRCULANT_BANDED`
-select dense or banded circulant preconditioners.
-`PrecondMethod.INCOMPLETE_CHOLESKY` factors the Gaussian stencil with
-zero fill, retaining its lower-triangular sparsity pattern.
-The default `PrecondMethod.AUTO` selects the dense circulant preconditioner
-for either dense block-FFT method, the banded circulant preconditioner
-for the banded block FFT, and incomplete Cholesky for the Gaussian stencil.
-Direct solves do not use a preconditioner.
+The preconditioner can be selected independently of the matrix-vector method.
+By default, `PrecondMethod.AUTO` chooses a preconditioner that matches the
+selected method's scaling. Notice that this is not necessarily the fastest choice.
+See [`PrecondMethod`](#precondmethod) for the exact mapping and the available 
+explicit choices. Direct solves do not use a preconditioner.
 
 The costs of the preconditioners are shown below. Banded bounds assume
 fixed $R$.
@@ -267,7 +287,7 @@ exclude preconditioning but include overlap-operator assembly and, for
 iterative methods, $m$ steps. The value of $m$ can depend on both the
 solver and the preconditioner. For a complete iterative solve, the
 preconditioner's setup cost is added once, and its application cost is
-incurred on each step; total storage combines the operator and
+incurred on each step. Total storage combines the operator and
 preconditioner storage. The banded and stencil bounds assume fixed $R$.
 
 | Overlap method | Solver Time | Operator storage |
@@ -341,11 +361,9 @@ Computes the von Neumann representation of the signal.
         These non-direct methods require an iterative solver
         (`SolverMethod.CG`, `SolverMethod.BICGSTAB`, or `SolverMethod.LGMRES`).
     - precond_method (PrecondMethod): Select the preconditioner independently.
-        `AUTO` preserves the method-specific defaults; `NONE` selects the
-        identity. `CIRCULANT_DENSE` and `CIRCULANT_BANDED` select dense or
-        banded circulant preconditioners. `INCOMPLETE_CHOLESKY` selects
-        zero-fill incomplete Cholesky of the Gaussian stencil. Direct
-        solves do not use a preconditioner.
+        `AUTO` chooses the method-matched default; see
+        [`PrecondMethod`](#precondmethod) for the exact mapping and explicit
+        choices. Direct solves do not use a preconditioner.
     - solver_method (SolverMethod): Method to solve the linear system.
         - `SolverMethod.DIRECT`: Use a direct solver. Requires
           `MatVecMethod.DIRECT`.
@@ -388,14 +406,18 @@ Reconstructs the signal from the von Neumann coefficients.
 
 ### Enums
 
-`BasisMethod`
+#### `BasisMethod`
+
 Selects how basis functions are handled in the projection and reconstruction:
+
 - `BasisMethod.DIRECT`: Precompute and store the basis functions.
 - `BasisMethod.FACTORISE`: Use the factorisation of the basis functions.
 - `BasisMethod.FFT`: Use the FFT to compute the projection and reconstruction.
 
-`MatVecMethod`
+#### `MatVecMethod`
+
 Selects how the overlap operator is applied:
+
 - `MatVecMethod.DIRECT`: Directly assemble the overlap matrix and multiply.
 - `MatVecMethod.TOEPLITZ_MATMUL`: Use the Toeplitz structure to compute
   the matrix-vector product.
@@ -406,17 +428,23 @@ Selects how the overlap operator is applied:
 - `MatVecMethod.GAUSSIAN_STENCIL`: Apply a local Gaussian stencil
   directly, with no FFT in the matrix-vector product.
 
-`PrecondMethod`
+#### `PrecondMethod`
+
 Selects the preconditioner for an iterative solver:
-- `PrecondMethod.AUTO`: Preserve the default pairing for each matvec method.
+
+- `PrecondMethod.AUTO`: Use the dense circulant preconditioner for
+  `TOEPLITZ_MATMUL` and `TOEPLITZ_EINSUM`, the banded circulant preconditioner
+  for `TOEPLITZ_BANDED`, and incomplete Cholesky for `GAUSSIAN_STENCIL`.
 - `PrecondMethod.NONE`: Use the identity preconditioner.
 - `PrecondMethod.CIRCULANT_DENSE`: Factorise dense Fourier blocks.
 - `PrecondMethod.CIRCULANT_BANDED`: Factorise banded Fourier blocks.
 - `PrecondMethod.INCOMPLETE_CHOLESKY`: Factorise the Gaussian stencil
   without fill, then apply two sparse triangular solves.
 
-`SolverMethod`
+#### `SolverMethod`
+
 Selects the linear solver for overlap inversion:
+
 - `SolverMethod.DIRECT`: Use a direct solver.
 - `SolverMethod.CG`: Use the conjugate gradient method.
 - `SolverMethod.BICGSTAB`: Use the biconjugate gradient stabilised method.

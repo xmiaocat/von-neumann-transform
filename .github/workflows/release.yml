@@ -15,7 +15,7 @@ jobs:
         run: echo "Publishing $GITHUB_REF"
 
       - name: Set up uv and Python
-        uses: astral-sh/setup-uv@v9
+        uses: astral-sh/setup-uv@v10.2.0
         with:
           python-version: "3.13"
 
