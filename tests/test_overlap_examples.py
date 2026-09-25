@@ -1,8 +1,9 @@
 from pathlib import Path
+
 import numpy as np
 import pytest
 
-from von_neumann_transform.overlap import _get_ovlp_direct, _get_ovlp_block
+from von_neumann_transform.overlap import _get_ovlp_block, _get_ovlp_direct
 
 DATA_DIR = Path(__file__).parent / "data"
 

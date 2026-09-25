@@ -1,4 +1,4 @@
-name: Mypy
+name: Ruff
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  mypy:
-    name: 📐 Mypy
+  ruff:
+    name: 🔍 Ruff
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,4 +16,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync --locked
-      - run: uv run --locked mypy src/von_neumann_transform
+      - name: Lint
+        run: uv run --locked ruff check src/von_neumann_transform tests
+      - name: Check formatting
+        run: uv run --locked ruff format --check src/von_neumann_transform tests

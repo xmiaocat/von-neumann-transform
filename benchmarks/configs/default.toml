@@ -1,0 +1,57 @@
+[run]
+ks = [8, 16, 32, 64]
+repeats = 5
+warmups = 0
+seed = 42
+output = "benchmarks/results/benchmarks.csv"
+direct_max_k = 32
+
+[transform]
+omega_min = 0.0
+omega_max = 5.0
+
+[solver]
+rtol = 1e-8
+atol = 0.0
+maxiter = 2000
+
+[memory]
+sample_interval = 0.001
+
+[studies]
+enabled = [
+    "operators",
+    "preconditioners",
+    "projection",
+    "reconstruction",
+]
+
+[studies.operators]
+cases = [
+    "operator-direct",
+    "operator-toeplitz-matmul",
+    "operator-toeplitz-einsum",
+    "operator-toeplitz-banded",
+    "operator-gaussian-stencil",
+]
+
+[studies.preconditioners]
+cases = [
+    "preconditioner-none",
+    "preconditioner-banded",
+    "preconditioner-dense",
+]
+
+[studies.projection]
+cases = [
+    "projection-direct",
+    "projection-factorise",
+    "projection-fft",
+]
+
+[studies.reconstruction]
+cases = [
+    "reconstruction-direct",
+    "reconstruction-factorise",
+    "reconstruction-fft",
+]

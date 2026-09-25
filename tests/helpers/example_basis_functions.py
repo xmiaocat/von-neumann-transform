@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 from pathlib import Path
+
 import numpy as np
+
 from von_neumann_transform.basis import _evaluate_basis_functions
 
 DATA_DIR = Path(__file__).parents[1] / "data"

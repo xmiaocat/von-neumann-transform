@@ -1,7 +1,7 @@
 # Von Neumann Transform
 
 [![Tests](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/tests.yml/badge.svg)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/tests.yml)
-[![Flake8](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/flake8.yml/badge.svg)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/flake8.yml)
+[![Ruff](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ruff.yml/badge.svg)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/ruff.yml)
 [![Mypy](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/mypy.yml/badge.svg)](https://github.com/xmiaocat/von-neumann-transform/actions/workflows/mypy.yml)
 [![Codecov](https://codecov.io/gh/xmiaocat/von-neumann-transform/branch/main/graph/badge.svg)](https://codecov.io/gh/xmiaocat/von-neumann-transform)
 [![PyPI version](https://img.shields.io/pypi/v/von-neumann-transform.svg)](https://pypi.org/project/von-neumann-transform/)
@@ -19,6 +19,7 @@ defined in
 - [ ] Add consistency tests for solvers.
 - [ ] Add consistency tests for inverse transform.
 
+
 ## Features
 - Grid generation: Build uniform time-frequency grids in the
   von Neumann plane.
@@ -32,12 +33,14 @@ defined in
   accounting for basis overlap using:
   - Direct solve: assemble the overlap matrix and apply a
     direct linear solver.
-  - Iterative solve: employ a matrix-vector operator and
-    iterative solver routines.
+  - Iterative solve: apply the overlap through a block FFT or
+    a local Gaussian stencil.
 - Signal reconstruction: Reconstruct the original frequency-domain
   signal from von Neumann coefficients.
-- Type-safe API: Enums (`BasisMethod`, `MatVecMethod`, `SolverMethod`)
+- Type-safe API: Enums (`BasisMethod`, `MatVecMethod`, `PrecondMethod`,
+  `SolverMethod`)
   select algorithms, all functions and methods include type hints.
+
 
 ## Installation
 
@@ -51,11 +54,16 @@ Install the latest development version from GitHub:
 pip install git+https://github.com/xmiaocat/von-neumann-transform.git
 ```
 
-To install in development mode including dev dependencies, 
-clone the repository and run:
+For development, clone the repository and run:
 ```bash
-pip install -e ".[dev]"
+uv sync
+uv run pytest
 ```
+
+The development tools are installed by default from the `dev` dependency
+group. The project environment is managed in `.venv`; no activation is
+needed when commands are run with `uv run`.
+
 
 ## Quickstart
 ```python
@@ -79,6 +87,16 @@ q_nm = vnt.transform(signal)
 signal_recon = vnt.inverse_transform(q_nm)
 ```
 
+
+## Threading and Performance
+
+Some NumPy and SciPy operations used by this package are parallelised by
+default. For repeated small operations, the computation may be dominated by
+thread-management overhead, so single-threaded execution is recommended.
+For dense direct solves and large factorisations, multiple threads may be
+beneficial.
+
+
 ## Algorithmic Details
 This section provides an overview of each method and its computational complexity.
 Suppose the signal has length $N$. Then $k = \sqrt{N}$ is chosen, so the
@@ -99,10 +117,12 @@ where $\alpha_{\omega_i t_j}(\omega)$ are the von Neumann basis functions
 and $\epsilon(\omega)$ is the signal in the frequency domain.
 
 In the discrete world, the basis functions $\alpha_{\omega_n t_m}(\omega)$
-are sampled at $N$ points in the frequency domain, and therefore has the
-shape `(k, k, N)`. The projection is then computed as
+are sampled at $N$ points in the frequency domain, and therefore have the
+shape `(k, k, N)`. For uniform grid spacing $\Delta\omega$, the projection
+is approximated as
 ```math
-  \alpha_{nm} = \sum_{p=0}^{N-1} \alpha_{\omega_n t_m}(\omega_p) \epsilon(\omega_p)\,.
+  \alpha_{nm} \approx \Delta\omega
+  \sum_{p=0}^{N-1} \alpha^*_{\omega_n t_m}(\omega_p)\epsilon(\omega_p)\,.
 ```
 The time complexity of this operation is $\mathcal{O}(k^2 N)$.
 The space complexity is also $\mathcal{O}(k^2 N)$ if the basis functions
@@ -142,77 +162,130 @@ The computational complexity of all three methods is summarised in the table bel
 | FFT-based (`BasisMethod.FFT`) | $\mathcal{O}(k N \log N) = \mathcal{O}(N^{3/2} \log N)$ | $\mathcal{O}(k N) = \mathcal{O}(N^{3/2})$ |
 
 ### Overlap Assembly & Solvers
-Since there are in total $k\times k = N$ basis functions, the overlap
-matrix
+The $N=k^2$ basis functions are not orthogonal. Their coefficients are
+therefore obtained by solving a linear system involving the $N\times N$
+overlap matrix
 ```math
-  S_{(n,m),(i,j)} = \sqrt{\frac{2\alpha}{\pi}}
-    \exp \left[ -\frac{\alpha}{2}(\omega_n - \omega_i)^2
-                -\frac{1}{8\alpha}(t_j - t_m)^2 
-                +\frac{\mathrm{i}}{2}(\omega_i - \omega_n)(t_j + t_m) \right]
+  S_{(n,m),(i,j)}
+  = \langle \alpha_{\omega_n t_m}|\alpha_{\omega_i t_j}\rangle
+  = \exp \left[
+      -\frac{\alpha}{2}(\omega_n-\omega_i)^2
+      -\frac{(t_m-t_j)^2}{8\alpha}
+      +\frac{\mathrm{i}}{2}(\omega_i-\omega_n)(t_m+t_j)
+    \right].
 ```
-has the dimension $N \times N$. Precomputing it and then solving the
-linear system
+The matrix is Hermitian, and the system is
 ```math
-  \sum_{(i,j)} S_{(n,m),(i,j)} q_{(i,j)} = \langle \alpha_{nm} | \epsilon \rangle
+  \sum_{i,j} S_{(n,m),(i,j)}q_{(i,j)}
+  = \langle \alpha_{\omega_n t_m}|\epsilon\rangle.
 ```
-directly would have a time complexity of $\mathcal{O}(N^3)$ 
-and a space complexity of $\mathcal{O}(N^2)$.
-This can become quite expensive for signals with a large number of points,
 
-In practice, the space is often the limiting factor. Therefore, the usual
-approach would be to implement a matrix-vector operator
-that computes the overlap-matrix-vector product on-the-fly
-by contracting each row, then feeds that result into an iterative 
-solver like the conjugate gradient method to solve the linear system.
-This approach has a time complexity of $\mathcal{O}(N^2)$ per iteration
-and a space complexity of $\mathcal{O}(N)$, which is much more feasible
-for large signals.
-However, the repeated evaluation of the overlap matrix and
-the matrix-vector product becomes very time-consuming.
-This method is not implemented in this package.
+The overlap has two useful properties. First, its blocks repeat along the
+frequency-grid direction. Second, the magnitude decays rapidly with
+separation in both the frequency and time directions. To see both, let
+$d=n-i$ and $\ell=m-j$, and denote the uniform grid spacings by
+$\Delta\omega$ and $\Delta t$. With
+$a=\alpha(\Delta\omega)^2/2$ and $b=(\Delta t)^2/(8\alpha)$,
+the entries can be written as
+```math
+  S_{(n,m),(i,j)}
+  = e^{-ad^2-b\ell^2}
+    \exp\left[-\mathrm{i}d\Delta\omega
+      \left(t_{\min}+\frac{m+j}{2}\Delta t\right)\right].
+```
+The phase has unit magnitude, so the Gaussian factor determines the
+localisation. On the grid used here,
+$a=b=\frac{\pi}{2}(1-k^{-2})$. The block indexed by $d$ is independent
+of the absolute frequency indices $n$ and $i$, whereas its phase still
+depends on the sum of the time indices $m+j$.
 
-Luckily, the overlap matrix has some structures that can be exploited.
-This matrix is actually a **H**ermitian **P**ositive **D**efinite 
-**B**lock **T**oeplitz matrix with **T**oeplitz-**H**ankel
-Hadamard Product **B**locks (HPDBTTHB).
-The block Toeplitz structure means that we only need the first
-block row and the first block column of the matrix to construct the
-entire matrix. Because of the hermiticity, we even only need the
-first block column of the dimension $N \times k$.
-Even better, the block Toeplitz structure allows one to efficiently compute
-the matrix-vector product by embedding the the matrix into a larger
-$2N \times 2N$ block circulant matrix and then using batch FFTs to compute
-the product in $\mathcal{O}(k^2 \log k)$ time.
-This way, the expensive "ordinary" matrix-vector product only needs to be
-computed on the much smaller blocks, thus reducing the time complexity
-of the matrix-vector product to $\mathcal{O}(k^3)$.
-Overall, the time complexity of this method is
-$\mathcal{O}(k^3)$ and the space complexity is $\mathcal{O}(k^3)$.
+One option is to assemble the full matrix and solve the system directly.
+This requires $\mathcal{O}(N^2)$ storage and
+$\mathcal{O}(N^3)$ time. Alternatively, an iterative solver can use a
+matrix-free operator that evaluates rows only as needed. This reduces
+storage to $\mathcal{O}(N)$, but each matrix-vector product still requires
+$\mathcal{O}(N^2)$ work. This row approach is not implemented. The
+implemented iterative methods reduce the product cost by exploiting either
+the repeated blocks or the Gaussian localisation.
 
-In theory, the Toeplitz-Hankel Hadamard product structure of the blocks
-can be exploited further to reduce the time complexity of the 
-matrix-vector product of blocks to $\mathcal{O}(k^2 \log k)$,
-but this is not implemented in this package yet.
+For the block-FFT methods, the dependence on $d$ gives a block Toeplitz
+matrix. A circulant embedding in the block direction turns the
+matrix-vector product into FFTs and independent products with $k\times k$
+Fourier-domain blocks. Keeping these blocks dense gives
+$\mathcal{O}(k^3)$ work per product and
+$\mathcal{O}(k^3)$ storage. The `MatVecMethod.TOEPLITZ_MATMUL` and
+`MatVecMethod.TOEPLITZ_EINSUM` methods differ only in how they contract
+those dense blocks with vectors. A circulant preconditioner is obtained
+by factorising the Fourier blocks, which adds
+$\mathcal{O}(k^4)$ preparation work.
 
-To accelerate the convergence, a circulant preconditioner is used 
-in the iterative solver, which does not increase the time complexity 
-for the iterative part but adds an additional $\mathcal{O}(k^4)$ 
-overhead for the preparation of the preconditioner.
+The Fourier-domain blocks retain the factor $e^{-b(m-j)^2}$.
+Consequently, `MatVecMethod.TOEPLITZ_BANDED` keeps only entries with
+$|m-j|\leq R$ in each Fourier block. The outer block FFT is unchanged,
+but the products in Fourier space now use bands rather than dense
+matrices. The retained blocks also admit a banded Cholesky circulant
+preconditioner. For fixed $R$, the FFTs determine the
+$\mathcal{O}(N\log N)$ cost per matrix-vector product, while banded
+multiplication and preconditioning require $\mathcal{O}(N)$ work.
 
-The computational complexity of the overlap assembly and solvers is summarised 
-in the table below:
-| Method          | Time Complexity   | Space Complexity |
-|-----------------|-------------------|------------------|
+Alternatively, `MatVecMethod.GAUSSIAN_STENCIL` truncates the original
+overlap matrix to $|d|\leq R$ and $|\ell|\leq R$. Each output couples
+to at most $(2R+1)^2$ neighbouring coefficients. The retained entries
+are stored in a sparse matrix and applied directly, with no circulant
+embedding or FFT. For fixed $R$, both storage and each matrix-vector
+product scale as $\mathcal{O}(N)$.
+
+Both approximations discard terms controlled by the Gaussian envelope.
+The Fourier-banded method truncates only the inner separation after the
+block FFT, while the stencil truncates both separations before multiplication.
+The current implementation uses $R=4$ for both methods.
+
+The preconditioner can be selected independently of the matrix-vector
+method.
+`PrecondMethod.NONE` selects the identity preconditioner, while
+`PrecondMethod.CIRCULANT_DENSE` and `PrecondMethod.CIRCULANT_BANDED`
+select dense or banded circulant preconditioners.
+`PrecondMethod.INCOMPLETE_CHOLESKY` factors the Gaussian stencil with
+zero fill, retaining its lower-triangular sparsity pattern.
+The default `PrecondMethod.AUTO` selects the dense circulant preconditioner
+for either dense block-FFT method, the banded circulant preconditioner
+for the banded block FFT, and incomplete Cholesky for the Gaussian stencil.
+Direct solves do not use a preconditioner.
+
+The costs of the preconditioners are shown below. Banded bounds assume
+fixed $R$.
+
+| Preconditioner | Setup time | Application time | Storage |
+|----------------|------------|------------------|---------|
+| identity (`PrecondMethod.NONE`) | $\mathcal{O}(1)$ | $\mathcal{O}(N)$ | $\mathcal{O}(1)$ |
+| dense circulant (`PrecondMethod.CIRCULANT_DENSE`) | $\mathcal{O}(N^2)$ | $\mathcal{O}(N^{3/2})$ | $\mathcal{O}(N^{3/2})$ |
+| banded circulant (`PrecondMethod.CIRCULANT_BANDED`) | $\mathcal{O}(N\log N)$ | $\mathcal{O}(N\log N)$ | $\mathcal{O}(N)$ |
+| IC(0) (`PrecondMethod.INCOMPLETE_CHOLESKY`) | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ | $\mathcal{O}(N)$ |
+
+Storage excludes the input and output vectors. The solver costs below
+exclude preconditioning but include overlap-operator assembly and, for
+iterative methods, $m$ steps. The value of $m$ can depend on both the
+solver and the preconditioner. For a complete iterative solve, the
+preconditioner's setup cost is added once, and its application cost is
+incurred on each step; total storage combines the operator and
+preconditioner storage. The banded and stencil bounds assume fixed $R$.
+
+| Overlap method | Solver Time | Operator storage |
+|----------------|-------------|------------------|
 | direct (`MatVecMethod.DIRECT`) | $\mathcal{O}(N^3)$ | $\mathcal{O}(N^2)$ |
-| rows of overlap + iterative solver (not implemented) | $\mathcal{O}(m\cdot N^2)$ | $\mathcal{O}(N)$ |
-| Toeplitz + iterative solver + preconditioner (`MatVecMethod.TOEPLITZ_MATMUL` or `MatVecMethod.TOEPLITZ_EINSUM`) | $\mathcal{O}(N^2 + m\cdot N^{3/2})$ | $\mathcal{O}(N^{3/2})$ |
-
-The variable $m$ is the number of iterations of the iterative solver.
+| dense block FFT (`MatVecMethod.TOEPLITZ_MATMUL` or `MatVecMethod.TOEPLITZ_EINSUM`) | $\mathcal{O}(N^{3/2}\log N+mN^{3/2})$ | $\mathcal{O}(N^{3/2})$ |
+| banded block FFT (`MatVecMethod.TOEPLITZ_BANDED`) | $\mathcal{O}((m+1)N\log N)$ | $\mathcal{O}(N)$ |
+| Gaussian stencil (`MatVecMethod.GAUSSIAN_STENCIL`) | $\mathcal{O}((m+1)N)$ | $\mathcal{O}(N)$ |
 
 ### Signal Reconstruction
-The signal reconstruction is simply the inverse of the signal projection,
-and thus the same assortment of methods with the same computational
-complexity applies.
+Signal reconstruction synthesises the frequency-domain signal from the
+coefficients obtained after solving the overlap system:
+```math
+  \epsilon_{\mathrm{rec}}(\omega)
+  = \sum_{n,m} q_{nm}\alpha_{\omega_n t_m}(\omega).
+```
+The same direct, factorised, and FFT-based strategies apply, with the
+corresponding computational complexities of signal projection.
 
 
 ## API Reference
@@ -237,6 +310,7 @@ transform(
     rtol: float = 1e-10,
     atol: float = 0.0,
     maxiter: int = 1000,
+    precond_method: PrecondMethod = PrecondMethod.AUTO,
 ) -> np.ndarray
 ```
 
@@ -260,8 +334,18 @@ Computes the von Neumann representation of the signal.
           to compute the matrix-vector product.
         - `MatVecMethod.TOEPLITZ_EINSUM`: Use the Toeplitz structure
           to compute the matrix-vector product with einsum.
-        The latter two methods require an iterative solver
+        - `MatVecMethod.TOEPLITZ_BANDED`: Retain near-diagonal entries
+          of the Fourier-domain blocks.
+        - `MatVecMethod.GAUSSIAN_STENCIL`: Apply a local overlap stencil
+          with a sparse matrix.
+        These non-direct methods require an iterative solver
         (`SolverMethod.CG`, `SolverMethod.BICGSTAB`, or `SolverMethod.LGMRES`).
+    - precond_method (PrecondMethod): Select the preconditioner independently.
+        `AUTO` preserves the method-specific defaults; `NONE` selects the
+        identity. `CIRCULANT_DENSE` and `CIRCULANT_BANDED` select dense or
+        banded circulant preconditioners. `INCOMPLETE_CHOLESKY` selects
+        zero-fill incomplete Cholesky of the Gaussian stencil. Direct
+        solves do not use a preconditioner.
     - solver_method (SolverMethod): Method to solve the linear system.
         - `SolverMethod.DIRECT`: Use a direct solver. Requires
           `MatVecMethod.DIRECT`.
@@ -270,7 +354,8 @@ Computes the von Neumann representation of the signal.
           stabilised method.
         - `SolverMethod.LGMRES`: Use the LGMRES method.
         The iterative solvers require
-        `MatVecMethod.TOEPLITZ_MATMUL` or `MatVecMethod.TOEPLITZ_EINSUM`.
+        `MatVecMethod.TOEPLITZ_MATMUL`, `MatVecMethod.TOEPLITZ_EINSUM`,
+        `MatVecMethod.TOEPLITZ_BANDED`, or `MatVecMethod.GAUSSIAN_STENCIL`.
     - rtol, atol (float): Relative and absolute tolerances for the
         iterative solver.
     - maxiter (int): Maximum number of iterations for the iterative
@@ -291,7 +376,7 @@ Reconstructs the signal from the von Neumann coefficients.
 
 - Parameters:
     - q_nm (np.ndarray): Von Neumann coefficients.
-    - method (BasisMethod): Method to compute the inverse projection.
+    - method (BasisMethod): Method to reconstruct the signal.
         Possible values are:
         - `BasisMethod.DIRECT`: Directly reconstruct the signal
           by precomputing and storing the basis functions.
@@ -316,8 +401,19 @@ Selects how the overlap operator is applied:
   the matrix-vector product.
 - `MatVecMethod.TOEPLITZ_EINSUM`: Use the Toeplitz structure to compute
   the matrix-vector product with einsum.
-- `MatVecMethod.TOEPLITZ_HANKEL`: Use the Toeplitz-Hankel structure
-  to compute the matrix-vector product. **Not implemented yet.**
+- `MatVecMethod.TOEPLITZ_BANDED`: Use the block FFT with banded
+  Fourier-domain blocks.
+- `MatVecMethod.GAUSSIAN_STENCIL`: Apply a local Gaussian stencil
+  directly, with no FFT in the matrix-vector product.
+
+`PrecondMethod`
+Selects the preconditioner for an iterative solver:
+- `PrecondMethod.AUTO`: Preserve the default pairing for each matvec method.
+- `PrecondMethod.NONE`: Use the identity preconditioner.
+- `PrecondMethod.CIRCULANT_DENSE`: Factorise dense Fourier blocks.
+- `PrecondMethod.CIRCULANT_BANDED`: Factorise banded Fourier blocks.
+- `PrecondMethod.INCOMPLETE_CHOLESKY`: Factorise the Gaussian stencil
+  without fill, then apply two sparse triangular solves.
 
 `SolverMethod`
 Selects the linear solver for overlap inversion:
@@ -329,4 +425,3 @@ Selects the linear solver for overlap inversion:
 ## License
 Distributed under the Apache License 2.0.
 See `LICENSE` for more information.
-

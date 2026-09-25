@@ -1,12 +1,13 @@
+from .methods import BasisMethod, MatVecMethod, PrecondMethod, SolverMethod
 from .transform import VonNeumannTransform
-from .methods import BasisMethod, MatVecMethod, SolverMethod
 
 # optional: define an explicit public API
 __all__ = [
-    "VonNeumannTransform",
     "BasisMethod",
     "MatVecMethod",
+    "PrecondMethod",
     "SolverMethod",
+    "VonNeumannTransform",
 ]
 
-version = "0.1.1"
+version = "0.2.0"

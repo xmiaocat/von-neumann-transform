@@ -1,0 +1,6 @@
+# Generated benchmark results
+/results/
+/reports/
+
+# Machine-specific configurations
+/configs/local/

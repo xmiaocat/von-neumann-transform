@@ -46,8 +46,8 @@ def _evaluate_basis_functions(
     norm = (2.0 * alpha / np.pi) ** 0.25
 
     alpha_nmo = np.zeros((k, k, k * k), dtype=np.complex128)
-    for i in range(0, k):
-        for j in range(0, k):
+    for i in range(k):
+        for j in range(k):
             alpha_nmo[i, j] = np.exp(
                 -alpha * (w_grid - w_n_arr[i]) ** 2
                 - 1.0j * t_n_arr[j] * (w_grid - w_n_arr[i]),

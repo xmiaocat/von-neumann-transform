@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -24,7 +25,7 @@ def ref_overlaps():
         w_min, w_max = 1000.0 * np.sort(rng.random(2))
         if w_max - w_min < 1e-3:
             w_max += 1e-3
-        w_grid, t_span, w_n_arr, t_n_arr, k, alpha = _get_grid(
+        _, _, w_n_arr, t_n_arr, _, alpha = _get_grid(
             npoints,
             w_min,
             w_max,

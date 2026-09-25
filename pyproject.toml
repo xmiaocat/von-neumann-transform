@@ -39,15 +39,17 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest >= 8.4",
     "pytest-cov >= 6.2",
-    "black",
-    "flake8",
-    "flake8-pyproject",
     "mypy",
+    "ruff",
     "pre-commit",
+]
+benchmark = [
+    "matplotlib >= 3.9",
+    "psutil >= 6.0",
 ]
 
 [project.urls]
@@ -61,20 +63,18 @@ style = "pep440"
 [tool.hatch.build.targets.sdist]
 exclude = ["tests/**"]
 
-[tool.black]
+[tool.ruff]
 line-length = 79
-target-version = ["py313"]
+target-version = "py311"
 
-[tool.flake8]
-exclude = ["tests/helpers", "build", "dist", "venv"]
-extend-ignore = ["E203", "E501"]
+[tool.ruff.lint]
+ignore = ['E741', 'TRY004']
 
 [tool.mypy]
-python_version = 3.13
+python_version = 3.11
 strict = false
 ignore_missing_imports = true
 files = "src/von_neumann_transform"
 
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report=term-missing"
-

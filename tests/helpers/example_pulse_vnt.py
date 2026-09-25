@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 from pathlib import Path
+
 import numpy as np
-import matplotlib.pyplot as plt
+
 from von_neumann_transform import (
-    VonNeumannTransform,
     BasisMethod,
     MatVecMethod,
     SolverMethod,
+    VonNeumannTransform,
 )
 
 DATA_DIR = Path(__file__).parents[1] / "data"

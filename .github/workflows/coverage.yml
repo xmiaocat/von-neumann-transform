@@ -12,12 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v9
         with:
           python-version: "3.13"
-      - run: pip install -e ".[dev]"
+      - run: uv sync --locked
       - name: Run tests
-        run: pytest --maxfail=1 --disable-warnings -q --cov=src/von_neumann_transform --cov-report=xml
+        run: uv run --locked pytest --maxfail=1 --disable-warnings -q --cov=src/von_neumann_transform --cov-report=xml
       - name: Upload coverage to Codecov
         if: always()
         uses: codecov/codecov-action@v5

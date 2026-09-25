@@ -68,8 +68,8 @@ def _reconstruct_signal_fft(
     q_tmp = np.zeros((k, k2), dtype=np.complex128)
     q_tmp[:, idx_cols] = tmp  # (k, k2)
 
-    # compute f_tmp[n, o] = \sum_m q_tmp[n, m] * e^{i t_m w_o}
-    # via batched FFT
+    # The FFT phase e^{-i t_m (w_o - w_0)} combines with the
+    # correction above to give e^{-i t_m w_o}.
     f_tmp = np.fft.fft(q_tmp, axis=1)
 
     # apply the Gaussian window

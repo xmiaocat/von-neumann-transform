@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import pytest
 
 from von_neumann_transform import VonNeumannTransform
@@ -7,7 +8,7 @@ DATA_DIR = Path(__file__).parent / "data"
 
 NPOINTS_LIST = [16, 256, 4096]
 NPOINTS_LIST_TYPEERROR = [16.0, 256.0, 4096.0]
-NPOINTS_LIST_VALUEERROR = [-16, -256, -4096]
+NPOINTS_LIST_VALUEERROR = [-16, -256, -4096, 0, 1]
 OMEGA_LIST = [
     (0.0, 1.0),
     (0.0, 10.0),

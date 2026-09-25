@@ -1,12 +1,13 @@
 from pathlib import Path
+
 import numpy as np
 import pytest
 
 from von_neumann_transform import (
-    VonNeumannTransform,
     BasisMethod,
     MatVecMethod,
     SolverMethod,
+    VonNeumannTransform,
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -20,21 +21,10 @@ MATVEC_AND_SOLVER_METHODS = [
     (MatVecMethod.TOEPLITZ_EINSUM, SolverMethod.CG),
     (MatVecMethod.TOEPLITZ_EINSUM, SolverMethod.BICGSTAB),
     (MatVecMethod.TOEPLITZ_EINSUM, SolverMethod.LGMRES),
-    pytest.param(
-        MatVecMethod.TOEPLITZ_HANKEL,
-        SolverMethod.CG,
-        marks=pytest.mark.xfail(reason="Hankel method not implemented yet"),
-    ),
-    pytest.param(
-        MatVecMethod.TOEPLITZ_HANKEL,
-        SolverMethod.BICGSTAB,
-        marks=pytest.mark.xfail(reason="Hankel method not implemented yet"),
-    ),
-    pytest.param(
-        MatVecMethod.TOEPLITZ_HANKEL,
-        SolverMethod.LGMRES,
-        marks=pytest.mark.xfail(reason="Hankel method not implemented yet"),
-    ),
+    (MatVecMethod.TOEPLITZ_BANDED, SolverMethod.CG),
+    (MatVecMethod.TOEPLITZ_BANDED, SolverMethod.BICGSTAB),
+    (MatVecMethod.TOEPLITZ_BANDED, SolverMethod.LGMRES),
+    (MatVecMethod.GAUSSIAN_STENCIL, SolverMethod.CG),
 ]
 MATVEC_AND_SOLVER_METHODS_XFAIL = [
     (MatVecMethod.DIRECT, SolverMethod.CG),
@@ -42,6 +32,7 @@ MATVEC_AND_SOLVER_METHODS_XFAIL = [
     (MatVecMethod.DIRECT, SolverMethod.LGMRES),
     (MatVecMethod.TOEPLITZ_MATMUL, SolverMethod.DIRECT),
     (MatVecMethod.TOEPLITZ_EINSUM, SolverMethod.DIRECT),
+    (MatVecMethod.GAUSSIAN_STENCIL, SolverMethod.DIRECT),
 ]
 
 

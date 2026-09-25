@@ -1,8 +1,9 @@
 from pathlib import Path
+
 import numpy as np
 import pytest
 
-from von_neumann_transform import VonNeumannTransform, BasisMethod
+from von_neumann_transform import BasisMethod, VonNeumannTransform
 
 DATA_DIR = Path(__file__).parent / "data"
 

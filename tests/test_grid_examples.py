@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -105,7 +106,7 @@ def test_grid_examples(ref_grid, npoints):
 
 @pytest.mark.parametrize("npoints", NPOINTS_LIST_XFAIL)
 def test_example_grids_xfail(ref_grid, npoints):
-    w_min_list, w_max, ref_dict = ref_grid
+    w_min_list, w_max, _ = ref_grid
     for w_min in w_min_list:
         with pytest.raises(ValueError):
             _get_grid(npoints, w_min, w_max)

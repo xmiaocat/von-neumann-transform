@@ -1,11 +1,11 @@
 import numpy as np
 import pytest
 
-from von_neumann_transform.basis import _get_grid, _evaluate_basis_functions
+from von_neumann_transform.basis import _evaluate_basis_functions, _get_grid
 from von_neumann_transform.projection import (
-    _project_signal,
     _get_signal_projection_factorise,
     _get_signal_projection_fft,
+    _project_signal,
 )
 
 NPOINTS_LIST = [16, 256, 4096]
@@ -27,7 +27,7 @@ def ref_projection():
         w_min, w_max = 1000.0 * np.sort(rng.random(2))
         if w_max - w_min < 1e-3:
             w_max += 1e-3
-        w_grid, t_span, w_n_arr, t_n_arr, k, alpha = _get_grid(
+        w_grid, _, w_n_arr, t_n_arr, _, alpha = _get_grid(
             npoints,
             w_min,
             w_max,

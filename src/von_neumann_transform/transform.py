@@ -1,14 +1,14 @@
 import numpy as np
-from scipy.sparse.linalg import LinearOperator, cg, bicgstab, lgmres
+from scipy.sparse.linalg import LinearOperator, bicgstab, cg, lgmres
 
-from .methods import BasisMethod, MatVecMethod, SolverMethod
-from .basis import _get_grid, _evaluate_basis_functions
+from .basis import _evaluate_basis_functions, _get_grid
+from .methods import BasisMethod, MatVecMethod, PrecondMethod, SolverMethod
+from .overlap import _get_ovlp_direct, _get_ovlp_linop
 from .projection import (
-    _project_signal,
     _get_signal_projection_factorise,
     _get_signal_projection_fft,
+    _project_signal,
 )
-from .overlap import _get_ovlp_direct, _get_ovlp_linop
 from .reconstruction import (
     _reconstruct_signal,
     _reconstruct_signal_factorise,
@@ -17,13 +17,12 @@ from .reconstruction import (
 
 
 class VonNeumannTransform:
-
     def __init__(self, npoints: int, omega_min: float, omega_max: float):
         # Validate input parameters
         if not isinstance(npoints, int):
             raise TypeError("Number of points must be an integer.")
-        if npoints <= 0:
-            raise ValueError("Number of points must be positive.")
+        if npoints < 4:
+            raise ValueError("Number of points must be at least 4.")
         if omega_min < 0.0 or omega_max < 0.0:
             raise ValueError("Angular frequencies must be non-negative.")
         if omega_max <= omega_min:
@@ -46,8 +45,38 @@ class VonNeumannTransform:
             self.alpha,
         ) = _get_grid(npoints, self.w_min, self.w_max)
 
-        # Placeholder for evaluated basis functions
+        # Cache the evaluated basis together with snapshots of its inputs.
         self.alpha_nmo: None | np.ndarray = None
+        self._basis_cache_inputs: (
+            tuple[np.ndarray, np.ndarray, np.ndarray, float] | None
+        ) = None
+
+    def _get_basis_functions(
+        self,
+        w_grid: np.ndarray,
+        w_n_arr: np.ndarray,
+        t_n_arr: np.ndarray,
+        alpha: float,
+    ) -> np.ndarray:
+        cached = self._basis_cache_inputs
+        basis = self.alpha_nmo
+        if (
+            basis is None
+            or cached is None
+            or cached[3] != alpha
+            or not np.array_equal(cached[0], w_grid)
+            or not np.array_equal(cached[1], w_n_arr)
+            or not np.array_equal(cached[2], t_n_arr)
+        ):
+            basis = _evaluate_basis_functions(w_grid, w_n_arr, t_n_arr, alpha)
+            self.alpha_nmo = basis
+            self._basis_cache_inputs = (
+                w_grid.copy(),
+                w_n_arr.copy(),
+                t_n_arr.copy(),
+                alpha,
+            )
+        return basis
 
     def get_signal_projection(
         self,
@@ -102,18 +131,13 @@ class VonNeumannTransform:
         """
 
         if method is BasisMethod.DIRECT:
-            if self.alpha_nmo is None:
-                # Evaluate the basis functions at the grid points
-                self.alpha_nmo = _evaluate_basis_functions(
-                    w_grid,
-                    w_n_arr,
-                    t_n_arr,
-                    alpha,
-                )
+            alpha_nmo = self._get_basis_functions(
+                w_grid, w_n_arr, t_n_arr, alpha
+            )
             # Project the signal onto the basis functions
             dw = w_grid[1] - w_grid[0]
             alpha_nm = _project_signal(
-                self.alpha_nmo,
+                alpha_nmo,
                 signal,
                 dw,
             )
@@ -134,9 +158,9 @@ class VonNeumannTransform:
                 signal,
             )
         else:
-            assert (
-                False
-            ), f"Unknown basis method: {method!r}"  # pragma: no cover
+            assert False, (
+                f"Unknown basis method: {method!r}"
+            )  # pragma: no cover
 
         return alpha_nm
 
@@ -146,11 +170,12 @@ class VonNeumannTransform:
         w_n_arr: np.ndarray,
         t_n_arr: np.ndarray,
         method: MatVecMethod = MatVecMethod.TOEPLITZ_MATMUL,
+        precond_method: PrecondMethod = PrecondMethod.AUTO,
     ) -> np.ndarray | tuple[LinearOperator, LinearOperator]:
         """
         Computes the overlap matrix for the basis functions defined by
         the von Neumann transform. The overlap matrix is defined as:
-        S_{(n,m), (i,j)} = \\sqrt{2 * alpha / pi} * exp(
+        S_{(n,m), (i,j)} = exp(
             -alpha/2 * (w_n - w_i)^2
             - (1 / (8 * alpha)) * (t_j - t_m)^2
             + i/2 * (w_i - w_n) * (t_j + t_m)
@@ -163,7 +188,7 @@ class VonNeumannTransform:
             t_n_arr (np.ndarray): Time grid in the von Neumann plane.
             method (MatVecMethod): Method to compute the overlap matrix.
                 Options are DIRECT, TOEPLITZ_MATMUL, TOEPLITZ_EINSUM,
-                and TOEPLITZ_HANKEL.
+                TOEPLITZ_BANDED, and GAUSSIAN_STENCIL.
 
                 The DIRECT method computes the overlap matrix
                 as a dense array.
@@ -182,13 +207,22 @@ class VonNeumannTransform:
                 of each block with a vector are computed using
                 the einsum function.
 
-                The TOEPLITZ_HANKEL method computes the overlap
-                matrix as a LinearOperator that exploits the
-                block Toeplitz structure of the matrix to compute
-                matrix-vector products efficiently. Products
-                of each block with a vector are computed by making use
-                of the Hankel structure of the blocks.
-                NOTE: This method is not implemented yet.
+                The TOEPLITZ_BANDED method uses the same block FFT,
+                retaining the main and four adjacent diagonals on
+                each side of each Fourier-domain block.
+
+                The GAUSSIAN_STENCIL method keeps overlap entries
+                within four outer and inner grid offsets and uses a
+                sparse matrix-vector product without an FFT.
+
+            precond_method (PrecondMethod): Preconditioner for iterative
+                solvers. AUTO preserves the default for each matrix-vector
+                method: dense circulant for TOEPLITZ_MATMUL and
+                TOEPLITZ_EINSUM, banded circulant for TOEPLITZ_BANDED,
+                and incomplete Cholesky with zero fill for
+                GAUSSIAN_STENCIL. NONE selects identity. All explicit
+                preconditioners can be chosen independently of the
+                matrix-vector method.
 
         Returns:
             ovlp (np.ndarray | tuple[LinearOperator, LinearOperator]):
@@ -201,22 +235,28 @@ class VonNeumannTransform:
         """
 
         if method is MatVecMethod.DIRECT:
+            if precond_method not in (PrecondMethod.AUTO, PrecondMethod.NONE):
+                raise ValueError(
+                    "DIRECT method does not use a preconditioner."
+                )
             return _get_ovlp_direct(alpha, w_n_arr, t_n_arr)
         elif method in (
             MatVecMethod.TOEPLITZ_MATMUL,
             MatVecMethod.TOEPLITZ_EINSUM,
-            MatVecMethod.TOEPLITZ_HANKEL,
+            MatVecMethod.TOEPLITZ_BANDED,
+            MatVecMethod.GAUSSIAN_STENCIL,
         ):
             return _get_ovlp_linop(
                 alpha,
                 w_n_arr,
                 t_n_arr,
                 method,
+                precond_method,
             )
         else:
-            assert (
-                False
-            ), f"Unknown matvec method: {method!r}"  # pragma: no cover
+            assert False, (
+                f"Unknown matvec method: {method!r}"
+            )  # pragma: no cover
 
     def solve_ovlp(
         self,
@@ -313,9 +353,9 @@ class VonNeumannTransform:
                     f"Warning: Solver did not converge after {info} iterations."
                 )  # pragma: no cover
         else:
-            assert (
-                False
-            ), f"Unknown solver method: {method!r}"  # pragma: no cover
+            assert False, (
+                f"Unknown solver method: {method!r}"
+            )  # pragma: no cover
 
         q_nm = q_nm.reshape(self.k, self.k)
 
@@ -330,6 +370,7 @@ class VonNeumannTransform:
         rtol: float = 1e-10,
         atol: float = 0.0,
         maxiter: int = 1000,
+        precond_method: PrecondMethod = PrecondMethod.AUTO,
     ) -> np.ndarray:
         """
         Computes the von Neumann coefficients for the input signal.
@@ -344,6 +385,8 @@ class VonNeumannTransform:
                 of the signal onto the basis functions.
             matvec_method (MatVecMethod): Method to compute the overlap matrix.
             solver_method (SolverMethod): Method to solve the linear system.
+            precond_method (PrecondMethod): Preconditioner for iterative
+                solvers. AUTO preserves the default for each matvec method.
             rtol, atol (float): Relative and absolute tolerances for the
                 iterative solver.
             maxiter (int): Maximum number of iterations for the iterative
@@ -370,6 +413,7 @@ class VonNeumannTransform:
             self.w_n_arr,
             self.t_n_arr,
             matvec_method,
+            precond_method,
         )
 
         # Solve the linear system to get the von Neumann coefficients
@@ -398,7 +442,7 @@ class VonNeumannTransform:
                        * exp(-alpha * (w - w_n)^2 - i * t_m * (w - w_n))
         Parameters:
             q_nm (np.ndarray): Von Neumann coefficients.
-            basis_method (BasisMethod): Method to reconstruct the signal.
+            method (BasisMethod): Method to reconstruct the signal.
                 Options are DIRECT, FACTORISE, and FFT.
 
                 The DIRECT method reconstructs the signal by
@@ -425,15 +469,10 @@ class VonNeumannTransform:
         """
 
         if method is BasisMethod.DIRECT:
-            if self.alpha_nmo is None:
-                # Evaluate the basis functions at the grid points
-                self.alpha_nmo = _evaluate_basis_functions(
-                    self.w_grid,
-                    self.w_n_arr,
-                    self.t_n_arr,
-                    self.alpha,
-                )
-            signal = _reconstruct_signal(q_nm, self.alpha_nmo)
+            alpha_nmo = self._get_basis_functions(
+                self.w_grid, self.w_n_arr, self.t_n_arr, self.alpha
+            )
+            signal = _reconstruct_signal(q_nm, alpha_nmo)
         elif method is BasisMethod.FACTORISE:
             signal = _reconstruct_signal_factorise(
                 q_nm,
@@ -451,8 +490,8 @@ class VonNeumannTransform:
                 self.alpha,
             )
         else:
-            assert (
-                False
-            ), f"Unknown basis method: {method!r}"  # pragma: no cover
+            assert False, (
+                f"Unknown basis method: {method!r}"
+            )  # pragma: no cover
 
         return signal
