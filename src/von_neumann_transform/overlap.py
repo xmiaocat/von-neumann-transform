@@ -4,7 +4,7 @@ from scipy.sparse import coo_matrix, csr_matrix, tril
 from scipy.sparse.linalg import (
     LinearOperator,
     aslinearoperator,
-    spsolve_triangular,
+    splu,
 )
 
 from .methods import MatVecMethod, PrecondMethod
@@ -223,6 +223,11 @@ def _get_ic0_factor(matrix: csr_matrix) -> csr_matrix:
     indices = lower.indices
     indptr = lower.indptr
     values = lower.data.copy()
+    conjugated = np.empty_like(values)
+    diagonal_values = np.empty(lower.shape[0], dtype=values.dtype)
+    # CSR positions increase from row to row, so entries left in this marker
+    # workspace are rejected by ``matching >= start`` without clearing it.
+    positions = [-1] * lower.shape[0]
 
     for i in range(lower.shape[0]):
         start, stop = indptr[i : i + 2]
@@ -231,21 +236,20 @@ def _get_ic0_factor(matrix: csr_matrix) -> csr_matrix:
                 f"IC(0) requires a diagonal entry in row {i}."
             )
         diagonal_position = stop - 1
-        positions = {
-            int(indices[position]): position
-            for position in range(start, diagonal_position)
-        }
+        for position in range(start, diagonal_position):
+            positions[int(indices[position])] = position
 
         for position in range(start, diagonal_position):
             j = int(indices[position])
             correction = 0j
             for prior in range(indptr[j], indptr[j + 1] - 1):
-                matching = positions.get(int(indices[prior]))
-                if matching is not None:
-                    correction += values[matching] * values[prior].conjugate()
-            values[position] = (values[position] - correction) / values[
-                indptr[j + 1] - 1
-            ]
+                matching = positions[int(indices[prior])]
+                if matching >= start:
+                    correction += values[matching] * conjugated[prior]
+            values[position] = (
+                values[position] - correction
+            ) / diagonal_values[j]
+            conjugated[position] = values[position].conjugate()
 
         diagonal = values[diagonal_position]
         pivot = (
@@ -259,7 +263,10 @@ def _get_ic0_factor(matrix: csr_matrix) -> csr_matrix:
             raise np.linalg.LinAlgError(
                 f"IC(0) failed at row {i}: non-positive pivot {pivot}."
             )
-        values[diagonal_position] = np.sqrt(pivot)
+        diagonal_value = np.sqrt(pivot)
+        values[diagonal_position] = diagonal_value
+        conjugated[diagonal_position] = diagonal_value
+        diagonal_values[i] = diagonal_value
 
     return csr_matrix((values, indices, indptr), shape=lower.shape)
 
@@ -387,11 +394,17 @@ def _get_ovlp_linop(
     elif precond_method is PrecondMethod.INCOMPLETE_CHOLESKY:
         assert stencil is not None
         factor = _get_ic0_factor(stencil)
-        upper = factor.conj().T.tocsr()
+        factor_solver = splu(
+            factor.tocsc(),
+            permc_spec="NATURAL",
+            diag_pivot_thresh=0.0,
+        )
 
         def precon(r):
-            y = spsolve_triangular(factor, r, lower=True)
-            return spsolve_triangular(upper, y, lower=False)
+            # Reuse SuperLU's prepared representation for both triangular
+            # systems instead of rebuilding them on every CG iteration.
+            y = factor_solver.solve(r)
+            return factor_solver.solve(y, trans="H")
 
         m_op = LinearOperator(
             (k * k, k * k),

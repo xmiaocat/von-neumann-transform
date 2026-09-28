@@ -10,4 +10,4 @@ __all__ = [
     "VonNeumannTransform",
 ]
 
-version = "0.2.0"
+version = "0.2.1"

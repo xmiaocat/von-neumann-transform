@@ -4,7 +4,7 @@
 the forward and inverse transforms:
 
 1. `operators`: overlap implementations with their natural preconditioners.
-2. `preconditioners`: identity, banded-circulant, and dense-circulant
+2. `preconditioners`: identity, banded-circulant, dense-circulant, and IC(0)
    preconditioners with Toeplitz-matmul and CG held fixed.
 3. `projection`: direct, factorised, and FFT signal projection.
 4. `reconstruction`: direct, factorised, and FFT signal reconstruction.
@@ -72,10 +72,10 @@ The operator study uses these pairings:
 | `operator-toeplitz-matmul` | dense block FFT (`matmul`) | dense circulant | CG |
 | `operator-toeplitz-einsum` | dense block FFT (`einsum`) | dense circulant | CG |
 | `operator-toeplitz-banded` | banded block FFT | banded circulant | CG |
-| `operator-gaussian-stencil` | sparse local stencil | none | CG |
+| `operator-gaussian-stencil` | sparse local stencil | IC(0) | CG |
 
 The preconditioner study holds `TOEPLITZ_MATMUL` and CG fixed, then compares
-`NONE`, `CIRCULANT_BANDED`, and `CIRCULANT_DENSE`.
+`NONE`, `CIRCULANT_BANDED`, `CIRCULANT_DENSE`, and `INCOMPLETE_CHOLESKY`.
 
 Solver rows include overlap-operator calls, preconditioner calls, the final
 relative residual, and whether that residual meets the requested tolerance.
@@ -149,4 +149,4 @@ base-10 decades of signal length $N = k^2$. The top labels the same data
 positions with the corresponding values of $k$. Vertical grid lines follow
 the base-10 axis. The CG iteration panel also uses a logarithmic vertical axis.
 The preconditioner legends name the actual methods as identity, circulant
-banded, and circulant dense.
+banded, circulant dense, and IC(0).

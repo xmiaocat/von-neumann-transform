@@ -269,6 +269,10 @@ The current implementation uses $R=4$ for both methods.
 The preconditioner can be selected independently of the matrix-vector method.
 By default, `PrecondMethod.AUTO` chooses a preconditioner that matches the
 selected method's scaling. Notice that this is not necessarily the fastest choice.
+In particular, the current IC(0) factorisation is implemented in Python, so its
+setup cost can dominate Gaussian-stencil solves. For lower wall time, consider
+selecting `PrecondMethod.CIRCULANT_BANDED` explicitly with
+`MatVecMethod.GAUSSIAN_STENCIL`.
 See [`PrecondMethod`](#precondmethod) for the exact mapping and the available 
 explicit choices. Direct solves do not use a preconditioner.
 

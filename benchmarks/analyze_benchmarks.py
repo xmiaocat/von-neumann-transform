@@ -251,6 +251,7 @@ def _label(case: str) -> str:
         "preconditioner-none": "identity",
         "preconditioner-banded": "circulant banded",
         "preconditioner-dense": "circulant dense",
+        "preconditioner-ic0": "IC(0)",
     }
     if case in preconditioners:
         return preconditioners[case]
@@ -313,10 +314,10 @@ def _panel(
     top_axis.xaxis.set_minor_locator(NullLocator())
     top_axis.grid(False)
     ax.text(
-        -0.03,
-        1.02,
+        0.00,
+        1.04,
         r"$k =$",
-        transform=top_axis.transAxes,
+        transform=ax.transAxes,
         ha="right",
         va="bottom",
     )
@@ -382,7 +383,7 @@ def _save_figures(
             "preconditioners": "Preconditioners",
         }[study]
         _figure_heading(
-            fig, axes, heading, legend_columns=5 if study == "operators" else 3
+            fig, axes, heading, legend_columns=5 if study == "operators" else 4
         )
         path = output_dir / f"{study}.svg"
         fig.savefig(path)

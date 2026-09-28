@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import cg
+from scipy.sparse.linalg import cg, spsolve_triangular
 
 from von_neumann_transform import (
     MatVecMethod,
@@ -11,7 +11,11 @@ from von_neumann_transform import (
     overlap,
 )
 from von_neumann_transform.basis import _get_grid
-from von_neumann_transform.overlap import _get_ic0_factor, _get_ovlp_linop
+from von_neumann_transform.overlap import (
+    _get_ic0_factor,
+    _get_ovlp_linop,
+    _get_ovlp_stencil,
+)
 
 MATVEC_METHODS = (
     MatVecMethod.TOEPLITZ_MATMUL,
@@ -172,6 +176,30 @@ def test_ic0_reports_nonpositive_pivot():
     matrix = csr_matrix(np.array([[1, 2], [2, 1]], dtype=np.complex128))
     with pytest.raises(np.linalg.LinAlgError, match="non-positive pivot"):
         _get_ic0_factor(matrix)
+
+
+def test_ic0_cached_solver_matches_triangular_solves():
+    k = 8
+    _, _, wn, tn, _, alpha = _get_grid(k * k, 0.2, 5.0)
+    stencil = _get_ovlp_stencil(alpha, wn, tn)
+    factor = _get_ic0_factor(stencil)
+    upper = factor.conj().T.tocsr()
+    _, preconditioner = _get_ovlp_linop(
+        alpha,
+        wn,
+        tn,
+        MatVecMethod.GAUSSIAN_STENCIL,
+        PrecondMethod.INCOMPLETE_CHOLESKY,
+    )
+    rng = np.random.default_rng(46)
+    residual = rng.normal(size=k * k) + 1j * rng.normal(size=k * k)
+    expected = spsolve_triangular(
+        upper,
+        spsolve_triangular(factor, residual, lower=True),
+        lower=False,
+    )
+
+    np.testing.assert_allclose(preconditioner @ residual, expected)
 
 
 def test_ic0_reduces_stencil_cg_iterations():
